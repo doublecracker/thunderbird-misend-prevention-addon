@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>アイコン生成</title>
+</head>
+<body>
+    <h1>Thunderbird 誤送信防止アドオン - アイコン生成</h1>
+    <p>このHTMLファイルをブラウザで開いて、アイコンをダウンロードしてください。</p>
+    
+    <h2>16x16 アイコン</h2>
+    <canvas id="icon16" width="16" height="16"></canvas>
+    <br>
+    <button onclick="downloadIcon('icon16', 'icon-16.png')">ダウンロード</button>
+    
+    <h2>32x32 アイコン</h2>
+    <canvas id="icon32" width="32" height="32"></canvas>
+    <br>
+    <button onclick="downloadIcon('icon32', 'icon-32.png')">ダウンロード</button>
+    
+    <h2>48x48 アイコン</h2>
+    <canvas id="icon48" width="48" height="48"></canvas>
+    <br>
+    <button onclick="downloadIcon('icon48', 'icon-48.png')">ダウンロード</button>
+    
+    <h2>128x128 アイコン</h2>
+    <canvas id="icon128" width="128" height="128"></canvas>
+    <br>
+    <button onclick="downloadIcon('icon128', 'icon-128.png')">ダウンロード</button>
+
+    <script>
+        function drawIcon(canvasId, size) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // 背景を透明にする
+            ctx.clearRect(0, 0, size, size);
+            
+            // 円形の背景
+            ctx.fillStyle = '#4285f4';
+            ctx.beginPath();
+            ctx.arc(size/2, size/2, size/2 - 2, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // 警告アイコン（感嘆符）
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${size * 0.6}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('!', size/2, size/2);
+        }
+        
+        function downloadIcon(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        // アイコンを描画
+        drawIcon('icon16', 16);
+        drawIcon('icon32', 32);
+        drawIcon('icon48', 48);
+        drawIcon('icon128', 128);
+    </script>
+</body>
+</html> 

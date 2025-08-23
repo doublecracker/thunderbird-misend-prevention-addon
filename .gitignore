@@ -1,0 +1,58 @@
+# Thunderbird誤送信防止アドオン - .gitignore
+
+# ビルド成果物
+web-ext-artifacts/
+*.zip
+
+# ログファイル
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 依存関係
+node_modules/
+.npm
+
+# 環境設定
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# エディタ・IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS生成ファイル
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 一時ファイル
+*.tmp
+*.temp
+
+# Mozilla固有
+.mozilla/
+profile/
+
+# web-ext固有
+.web-ext-config.js
+
+# バックアップファイル
+*.bak
+*.backup
+
+# 開発用ファイル
+test/
+docs/drafts/
+*.draft.md

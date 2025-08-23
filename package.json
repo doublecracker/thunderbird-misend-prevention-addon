@@ -1,0 +1,109 @@
+{
+  "name": "thunderbird-misend-prevention",
+  "version": "1.1.4",
+  "description": "TO欄に複数のメールアドレスがある場合の誤送信を防止するThunderbirdアドオン",
+  "main": "manifest.json",
+  "scripts": {
+    "build": "web-ext build --overwrite-dest",
+    "dev": "web-ext run --target=thunderbird",
+    "run": "web-ext run --target=thunderbird",
+    "lint": "web-ext lint",
+    "sign": "web-ext sign",
+    "test": "npm run lint && npm run build",
+    "clean": "rm -rf web-ext-artifacts",
+    "package": "npm run clean && npm run build"
+  },
+  "keywords": [
+    "thunderbird",
+    "addon",
+    "webextension",
+    "email",
+    "misend-prevention",
+    "bcc",
+    "mass-email",
+    "privacy",
+    "security",
+    "email-safety",
+    "japanese",
+    "japan"
+  ],
+  "author": {
+    "name": "AKIO OGAWA",
+    "email": "firecracker2100@yahoo.co.jp"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "devDependencies": {
+    "web-ext": "^7.12.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/akioogawa/thunderbird-misend-prevention.git"
+  },
+  "bugs": {
+    "url": "https://github.com/akioogawa/thunderbird-misend-prevention/issues"
+  },
+  "homepage": "https://github.com/akioogawa/thunderbird-misend-prevention#readme",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/akioogawa"
+  },
+  "files": [
+    "manifest.json",
+    "background.js",
+    "content.js",
+    "icons/",
+    "README.md",
+    "LICENSE.txt",
+    "CHANGELOG.md"
+  ],
+  "browserslist": [
+    "Firefox >= 78"
+  ],
+  "web-ext": {
+    "sourceDir": "./",
+    "artifactsDir": "./web-ext-artifacts/",
+    "build": {
+      "overwriteDest": true
+    },
+    "run": {
+      "target": [
+        "thunderbird"
+      ],
+      "startUrl": [
+        "about:debugging"
+      ]
+    },
+    "lint": {
+      "output": "text"
+    }
+  },
+  "thunderbird": {
+    "strict_min_version": "78.0",
+    "strict_max_version": "150.*"
+  },
+  "manifest": {
+    "version": "1.1.4",
+    "applications": {
+      "gecko": {
+        "id": "misend-prevention@akioogawa.com",
+        "strict_min_version": "78.0",
+        "strict_max_version": "150.*"
+      }
+    }
+  },
+  "categories": [
+    "email",
+    "productivity",
+    "security"
+  ],
+  "tags": [
+    "thunderbird",
+    "email-safety",
+    "misend-prevention",
+    "japanese"
+  ]
+} 
