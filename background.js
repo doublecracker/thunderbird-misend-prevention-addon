@@ -1,7 +1,7 @@
 // Thunderbird 誤送信防止アドオン - バックグラウンドスクリプト
 // 作成者: AKIO OGAWA
 // 作成日: 2025年8月23日
-// 最終更新: 2025年8月23日 (v1.2.0 - プライバシー保護強化版)
+// 最終更新: 2025年8月23日 (v1.2.0 - プライバシー保護強化版 + CC設定機能)
 
 console.log("=== Thunderbird 誤送信防止アドオンが起動しました ===");
 
@@ -10,6 +10,63 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // プライバシー保護強化機能の設定
 const PRIVACY_ENHANCEMENT_ENABLED = true; // 実験的機能の有効/無効
+
+// デフォルト設定
+const DEFAULT_SETTINGS = {
+  privacyEnhancement: true,
+  ccMultipleAllowed: false, // CC欄の複数アドレス送信を許可するかどうか
+  showNotifications: true,
+  enableLogging: true
+};
+
+// 現在の設定
+let currentSettings = { ...DEFAULT_SETTINGS };
+
+// 設定を読み込む関数
+async function loadSettings() {
+  try {
+    const stored = await browser.storage.local.get('addonSettings');
+    if (stored.addonSettings) {
+      currentSettings = { ...DEFAULT_SETTINGS, ...stored.addonSettings };
+      console.log("✅ 設定を読み込みました:", currentSettings);
+    } else {
+      // 初回起動時はデフォルト設定を保存
+      await saveSettings(currentSettings);
+      console.log("✅ デフォルト設定を保存しました:", currentSettings);
+    }
+  } catch (error) {
+    console.error("❌ 設定の読み込みに失敗しました:", error);
+    currentSettings = { ...DEFAULT_SETTINGS };
+  }
+}
+
+// 設定を保存する関数
+async function saveSettings(settings) {
+  try {
+    await browser.storage.local.set({ addonSettings: settings });
+    currentSettings = { ...settings };
+    console.log("✅ 設定を保存しました:", currentSettings);
+    return true;
+  } catch (error) {
+    console.error("❌ 設定の保存に失敗しました:", error);
+    return false;
+  }
+}
+
+// 設定を更新する関数
+async function updateSetting(key, value) {
+  const newSettings = { ...currentSettings, [key]: value };
+  const success = await saveSettings(newSettings);
+  if (success) {
+    console.log(`✅ 設定を更新しました: ${key} = ${value}`);
+  }
+  return success;
+}
+
+// 設定を取得する関数
+function getSetting(key) {
+  return currentSettings[key] !== undefined ? currentSettings[key] : DEFAULT_SETTINGS[key];
+}
 
 // 送信元メールアドレスを抽出する関数
 function extractMyEmail(fromField) {
@@ -67,7 +124,7 @@ function extractMyEmail(fromField) {
 async function enhancePrivacy(tabId, composeDetails) {
   console.log("🔒 プライバシー保護強化機能を開始");
   
-  if (!PRIVACY_ENHANCEMENT_ENABLED) {
+  if (!getSetting('privacyEnhancement')) {
     console.log("⚠️ プライバシー保護強化機能は無効です");
     return false;
   }
@@ -105,12 +162,14 @@ async function enhancePrivacy(tabId, composeDetails) {
         console.log("✅ TO欄に送信元アドレスを追加しました:", myEmail);
         
         // 成功通知
-        await browser.notifications.create('privacy-enhanced-' + Date.now(), {
-          type: 'basic',
-          iconUrl: '',
-          title: '🔒 プライバシー保護強化完了',
-          message: `送信元アドレスをTO欄に追加しました。BCC欄の${bccAddresses.length}個のアドレスは相互に非表示です。`
-        });
+        if (getSetting('showNotifications')) {
+          await browser.notifications.create('privacy-enhanced-' + Date.now(), {
+            type: 'basic',
+            iconUrl: '',
+            title: '🔒 プライバシー保護強化完了',
+            message: `送信元アドレスをTO欄に追加しました。BCC欄の${bccAddresses.length}個のアドレスは相互に非表示です。`
+          });
+        }
         
         return true;
       } catch (error) {
@@ -133,12 +192,14 @@ async function showPrivacyEnhancementDialog(tabId, myEmail, bccCount) {
   
   try {
     // システム通知
-    await browser.notifications.create('privacy-enhancement-confirm-' + Date.now(), {
-      type: 'basic',
-      iconUrl: '',
-      title: '🔒 プライバシー保護強化の提案',
-      message: `TO欄が空ですが、BCC欄に${bccCount}個のアドレスがあります。送信元アドレスをTO欄に自動追加しますか？`
-    });
+    if (getSetting('showNotifications')) {
+      await browser.notifications.create('privacy-enhancement-confirm-' + Date.now(), {
+        type: 'basic',
+        iconUrl: '',
+        title: '🔒 プライバシー保護強化の提案',
+        message: `TO欄が空ですが、BCC欄に${bccCount}個のアドレスがあります。送信元アドレスをTO欄に自動追加しますか？`
+      });
+    }
     
     // アラートダイアログで確認
     await browser.tabs.executeScript(tabId, {
@@ -182,38 +243,50 @@ async function showPrivacyEnhancementDialog(tabId, myEmail, bccCount) {
 
 // TO欄のメールアドレスを解析する関数（改善版）
 function parseEmailAddresses(recipients) {
-  console.log("📧 parseEmailAddresses 呼び出し:", recipients);
+  if (getSetting('enableLogging')) {
+    console.log("📧 parseEmailAddresses 呼び出し:", recipients);
+  }
   
   if (!recipients || recipients.length === 0) {
-    console.log("recipients が空です");
+    if (getSetting('enableLogging')) {
+      console.log("recipients が空です");
+    }
     return [];
   }
   
   const addresses = [];
   
   recipients.forEach(recipient => {
-    console.log("📧 個別recipient処理:", recipient);
+    if (getSetting('enableLogging')) {
+      console.log("📧 個別recipient処理:", recipient);
+    }
     
     let emailAddress = null;
     
     // 1. オブジェクト形式の場合
     if (typeof recipient === 'object' && recipient.address) {
       emailAddress = recipient.address;
-      console.log("📧 オブジェクト形式から抽出:", emailAddress);
+      if (getSetting('enableLogging')) {
+        console.log("📧 オブジェクト形式から抽出:", emailAddress);
+      }
     }
     // 2. 文字列形式の場合
     else if (typeof recipient === 'string') {
       // 2-1. 直接メールアドレスの場合
       if (EMAIL_REGEX.test(recipient)) {
         emailAddress = recipient;
-        console.log("📧 直接メールアドレス:", emailAddress);
+        if (getSetting('enableLogging')) {
+          console.log("📧 直接メールアドレス:", emailAddress);
+        }
       }
       // 2-2. "名前 <メールアドレス>" 形式の場合
       else {
         const match = recipient.match(/<([^>]+)>/);
         if (match && EMAIL_REGEX.test(match[1])) {
           emailAddress = match[1];
-          console.log("📧 名前付き形式から抽出:", emailAddress);
+          if (getSetting('enableLogging')) {
+            console.log("📧 名前付き形式から抽出:", emailAddress);
+          }
         }
         // 2-3. その他の形式を試行
         else {
@@ -222,7 +295,9 @@ function parseEmailAddresses(recipients) {
           const lastPart = parts[parts.length - 1];
           if (EMAIL_REGEX.test(lastPart)) {
             emailAddress = lastPart;
-            console.log("📧 分割抽出:", emailAddress);
+            if (getSetting('enableLogging')) {
+              console.log("📧 分割抽出:", emailAddress);
+            }
           }
         }
       }
@@ -231,13 +306,19 @@ function parseEmailAddresses(recipients) {
     // 有効なメールアドレスを配列に追加
     if (emailAddress && EMAIL_REGEX.test(emailAddress)) {
       addresses.push(emailAddress);
-      console.log("📧 有効なアドレスとして追加:", emailAddress);
+      if (getSetting('enableLogging')) {
+        console.log("📧 有効なアドレスとして追加:", emailAddress);
+      }
     } else {
-      console.log("📧 無効なアドレス:", recipient);
+      if (getSetting('enableLogging')) {
+        console.log("📧 無効なアドレス:", recipient);
+      }
     }
   });
   
-  console.log("📧 最終的に解析されたアドレス:", addresses);
+  if (getSetting('enableLogging')) {
+    console.log("📧 最終的に解析されたアドレス:", addresses);
+  }
   return addresses;
 }
 
@@ -284,7 +365,7 @@ async function performMisendCheck(composeDetails) {
   console.log("📧 CCアドレス一覧:", ccAddresses);
   console.log("📧 BCCアドレス一覧:", bccAddresses);
 
-  // TO欄またはCC欄に複数のメールアドレスがある場合に警告
+  // TO欄に複数のメールアドレスがある場合に警告
   if (toAddresses.length > 1) {
     console.log("⚠️ 複数のTOアドレスが検出されました!");
     console.log("検出されたアドレス:", toAddresses);
@@ -295,16 +376,25 @@ async function performMisendCheck(composeDetails) {
     console.log("🚨 TO欄警告処理結果:", warningResult);
     
     return true; // 送信を停止
-  } else if (ccAddresses.length > 1) {
+  } 
+  // CC欄に複数のメールアドレスがある場合の処理（設定に応じて）
+  else if (ccAddresses.length > 1) {
     console.log("⚠️ 複数のCCアドレスが検出されました!");
     console.log("検出されたアドレス:", ccAddresses);
-    console.log("🚨 CC欄警告処理を開始します");
     
-    // 警告ダイアログを表示
-    const warningResult = await showWarningDialog(composeDetails.tabId, ccAddresses, "CC");
-    console.log("🚨 CC欄警告処理結果:", warningResult);
-    
-    return true; // 送信を停止
+    // CC欄の複数アドレス送信が許可されているかチェック
+    if (getSetting('ccMultipleAllowed')) {
+      console.log("✅ CC欄の複数アドレス送信が許可されています。送信を続行します。");
+      return false; // 送信を続行
+    } else {
+      console.log("🚨 CC欄警告処理を開始します");
+      
+      // 警告ダイアログを表示
+      const warningResult = await showWarningDialog(composeDetails.tabId, ccAddresses, "CC");
+      console.log("🚨 CC欄警告処理結果:", warningResult);
+      
+      return true; // 送信を停止
+    }
   } else if (toAddresses.length === 1) {
     console.log("✅ TOアドレスは1つです。送信を続行します。");
   } else if (toAddresses.length === 0 && bccAddresses.length > 0) {
@@ -331,16 +421,18 @@ async function showWarningDialog(tabId, addresses, fieldType = "TO") {
   
   try {
     // 方法1: 即座にシステム通知（最重要）
-    try {
-      await browser.notifications.create('misend-warning-immediate-' + Date.now(), {
-        type: 'basic',
-        iconUrl: '',
-        title: '🚨 誤送信防止警告',
-        message: `${fieldType}欄に${addresses.length}個のメールアドレスが検出されました！送信が停止されました。`
-      });
-      console.log("✅ 即座のシステム通知を表示しました");
-    } catch (notifyError) {
-      console.log("即座通知エラー:", notifyError.message);
+    if (getSetting('showNotifications')) {
+      try {
+        await browser.notifications.create('misend-warning-immediate-' + Date.now(), {
+          type: 'basic',
+          iconUrl: '',
+          title: '🚨 誤送信防止警告',
+          message: `${fieldType}欄に${addresses.length}個のメールアドレスが検出されました！送信が停止されました。`
+        });
+        console.log("✅ 即座のシステム通知を表示しました");
+      } catch (notifyError) {
+        console.log("即座通知エラー:", notifyError.message);
+      }
     }
     
     // 方法2: コンソールに目立つ警告を表示（常に動作）
@@ -388,26 +480,28 @@ async function showWarningDialog(tabId, addresses, fieldType = "TO") {
     }
     
     // 方法4: 複数の追加通知（時間差で確実に表示）
-    const additionalNotifications = [
-      { delay: 1000, title: '🚫 送信が停止されました', message: `BCC欄を使用して送信してください。` },
-      { delay: 2000, title: '⚠️ 重要: 送信が停止されています', message: `${fieldType}欄の複数アドレスをBCC欄に移動してください。` },
-      { delay: 3000, title: '🚨 緊急: 誤送信の危険性', message: `${fieldType}欄に${addresses.length}個のアドレスがあります。BCC欄に移動してください。` }
-    ];
-    
-    additionalNotifications.forEach(({ delay, title, message }) => {
-      setTimeout(async () => {
-        try {
-          await browser.notifications.create('misend-warning-' + Date.now(), {
-            type: 'basic',
-            iconUrl: '',
-            title: title,
-            message: message
-          });
-        } catch (notifyError) {
-          console.log(`通知エラー (${delay}ms):`, notifyError.message);
-        }
-      }, delay);
-    });
+    if (getSetting('showNotifications')) {
+      const additionalNotifications = [
+        { delay: 1000, title: '🚫 送信が停止されました', message: `BCC欄を使用して送信してください。` },
+        { delay: 2000, title: '⚠️ 重要: 送信が停止されています', message: `${fieldType}欄の複数アドレスをBCC欄に移動してください。` },
+        { delay: 3000, title: '🚨 緊急: 誤送信の危険性', message: `${fieldType}欄に${addresses.length}個のアドレスがあります。BCC欄に移動してください。` }
+      ];
+      
+      additionalNotifications.forEach(({ delay, title, message }) => {
+        setTimeout(async () => {
+          try {
+            await browser.notifications.create('misend-warning-' + Date.now(), {
+              type: 'basic',
+              iconUrl: '',
+              title: title,
+              message: message
+            });
+          } catch (notifyError) {
+            console.log(`通知エラー (${delay}ms):`, notifyError.message);
+          }
+        }, delay);
+      });
+    }
     
     return true; // 送信を停止
     
@@ -423,6 +517,9 @@ async function showWarningDialog(tabId, addresses, fieldType = "TO") {
 // 初期化関数
 async function initializeAddon() {
   console.log("🔍 アドオン初期化開始...");
+  
+  // 設定を読み込み
+  await loadSettings();
   
   try {
     // 方法1: onBeforeSend API（推奨）
@@ -469,6 +566,19 @@ async function initializeAddon() {
         });
         return true; // 非同期レスポンス
       }
+      
+      // 設定関連のメッセージ処理
+      if (request.action === 'getSettings') {
+        sendResponse({ settings: currentSettings });
+        return true;
+      }
+      
+      if (request.action === 'updateSetting') {
+        updateSetting(request.key, request.value).then(success => {
+          sendResponse({ success: success });
+        });
+        return true;
+      }
     });
     
     isInitialized = true;
@@ -498,7 +608,10 @@ browser.runtime.onInstalled.addListener(async (details) => {
     console.log("Browser compose API:", !!browser.compose);
     console.log("Runtime ID:", browser.runtime.id);
     console.log("初期化完了:", isInitialized);
-    console.log("プライバシー保護強化機能:", PRIVACY_ENHANCEMENT_ENABLED ? "有効" : "無効");
+    console.log("プライバシー保護強化機能:", getSetting('privacyEnhancement') ? "有効" : "無効");
+    console.log("CC欄複数アドレス送信:", getSetting('ccMultipleAllowed') ? "許可" : "禁止");
+    console.log("通知表示:", getSetting('showNotifications') ? "有効" : "無効");
+    console.log("ログ出力:", getSetting('enableLogging') ? "有効" : "無効");
     console.log("===================");
   }, 1000);
 });

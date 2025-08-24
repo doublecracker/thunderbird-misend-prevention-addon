@@ -2,7 +2,7 @@
   "manifest_version": 2,
   "name": "Thunderbird 誤送信防止アドオン (実験版)",
   "version": "1.2.0",
-  "description": "TO欄・CC欄に複数のメールアドレスがある場合の誤送信を防止します。実験的機能としてプライバシー保護強化機能を含みます。",
+  "description": "TO欄・CC欄に複数のメールアドレスがある場合の誤送信を防止します。実験的機能としてプライバシー保護強化機能と設定機能を含みます。",
   "author": "AKIO OGAWA",
   
   "applications": {
@@ -16,7 +16,8 @@
     "compose",
     "notifications",
     "tabs",
-    "activeTab"
+    "activeTab",
+    "storage"
   ],
   
   "background": {
@@ -30,5 +31,10 @@
       "js": ["content.js"],
       "run_at": "document_end"
     }
-  ]
+  ],
+  
+  "options_ui": {
+    "page": "options.html",
+    "browser_style": false
+  }
 } 
