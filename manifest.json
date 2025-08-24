@@ -2,14 +2,13 @@
   "manifest_version": 2,
   "name": "Thunderbird 誤送信防止アドオン",
   "version": "1.1.4",
-  "description": "TO欄に複数のメールアドレスがある場合の誤送信を防止します",
+  "description": "TO欄・CC欄に複数のメールアドレスがある場合の誤送信を防止します",
   "author": "AKIO OGAWA",
   
   "applications": {
     "gecko": {
       "id": "misend-prevention@example.com",
-      "strict_min_version": "78.0",
-      "strict_max_version": "150.*"
+      "strict_min_version": "78.0"
     }
   },
   
