@@ -1,7 +1,7 @@
 {
   "name": "thunderbird-misend-prevention",
-  "version": "1.1.4",
-  "description": "TO欄に複数のメールアドレスがある場合の誤送信を防止するThunderbirdアドオン",
+  "version": "1.2.0",
+  "description": "TO欄・CC欄に複数のメールアドレスがある場合の誤送信を防止するThunderbirdアドオン（実験的機能：プライバシー保護強化機能を含む）",
   "main": "manifest.json",
   "scripts": {
     "build": "web-ext build --overwrite-dest",
@@ -25,7 +25,9 @@
     "security",
     "email-safety",
     "japanese",
-    "japan"
+    "japan",
+    "privacy-enhancement",
+    "experimental"
   ],
   "author": {
     "name": "AKIO OGAWA",
@@ -86,7 +88,7 @@
     "strict_max_version": "150.*"
   },
   "manifest": {
-    "version": "1.1.4",
+    "version": "1.2.0",
     "applications": {
       "gecko": {
         "id": "misend-prevention@akioogawa.com",
@@ -98,12 +100,15 @@
   "categories": [
     "email",
     "productivity",
-    "security"
+    "security",
+    "privacy"
   ],
   "tags": [
     "thunderbird",
     "email-safety",
     "misend-prevention",
-    "japanese"
+    "japanese",
+    "privacy-enhancement",
+    "experimental"
   ]
 } 
