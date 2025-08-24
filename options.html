@@ -54,21 +54,30 @@
       background: white;
       border-radius: 4px;
       border-left: 4px solid #3498db;
+      gap: 15px;
+    }
+    
+    .setting-content {
+      flex: 1;
+      min-width: 0;
+      max-width: calc(100% - 70px);
     }
     
     .setting-item label {
-      flex: 1;
+      display: block;
       font-weight: 500;
       cursor: pointer;
       font-size: 13px;
       line-height: 1.4;
+      margin-bottom: 4px;
     }
     
     .setting-item .description {
       font-size: 0.85em;
       color: #666;
-      margin-top: 4px;
       line-height: 1.3;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     
     .toggle-switch {
@@ -76,8 +85,8 @@
       display: inline-block;
       width: 50px;
       height: 28px;
-      margin-left: 10px;
       flex-shrink: 0;
+      flex-grow: 0;
     }
     
     .toggle-switch input {
@@ -215,7 +224,7 @@
     <div class="setting-group">
       <h3>🔒 プライバシー保護強化機能 <span class="experimental-badge">実験的</span></h3>
       <div class="setting-item">
-        <div>
+        <div class="setting-content">
           <label for="privacyEnhancement">プライバシー保護強化機能を有効にする</label>
           <div class="description">
             BCC欄のみで送信する際、TO欄が空の場合は送信元アドレスをTO欄に自動追加します。
@@ -227,12 +236,25 @@
           <span class="slider"></span>
         </label>
       </div>
+      <div class="setting-item">
+        <div class="setting-content">
+          <label for="privacyEnhancementConfirm">プライバシー保護強化の確認を表示する</label>
+          <div class="description">
+            有効にすると、TO欄への送信元アドレス追加前にユーザーに確認を求めます。
+            無効にすると、自動的に追加されます。
+          </div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="privacyEnhancementConfirm">
+          <span class="slider"></span>
+        </label>
+      </div>
     </div>
     
     <div class="setting-group">
       <h3>📧 CC欄の設定</h3>
       <div class="setting-item">
-        <div>
+        <div class="setting-content">
           <label for="ccMultipleAllowed">CC欄での複数アドレス送信を許可する</label>
           <div class="description">
             有効にすると、CC欄に複数のメールアドレスがあっても送信を許可します。
@@ -249,7 +271,7 @@
     <div class="setting-group">
       <h3>🔔 通知設定</h3>
       <div class="setting-item">
-        <div>
+        <div class="setting-content">
           <label for="showNotifications">システム通知を表示する</label>
           <div class="description">
             有効にすると、警告や処理完了時にシステム通知が表示されます。
@@ -265,7 +287,7 @@
     <div class="setting-group">
       <h3>📝 デバッグ設定</h3>
       <div class="setting-item">
-        <div>
+        <div class="setting-content">
           <label for="enableLogging">詳細ログを出力する</label>
           <div class="description">
             有効にすると、コンソールに詳細なログが出力されます。

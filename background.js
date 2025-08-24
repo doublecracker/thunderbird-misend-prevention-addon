@@ -16,7 +16,8 @@ const DEFAULT_SETTINGS = {
   privacyEnhancement: true,
   ccMultipleAllowed: false, // CC欄の複数アドレス送信を許可するかどうか
   showNotifications: true,
-  enableLogging: true
+  enableLogging: true,
+  privacyEnhancementConfirm: true
 };
 
 // 現在の設定
@@ -66,6 +67,24 @@ async function updateSetting(key, value) {
 // 設定を取得する関数
 function getSetting(key) {
   return currentSettings[key] !== undefined ? currentSettings[key] : DEFAULT_SETTINGS[key];
+}
+
+// ストレージ変更の監視（設定画面からの変更を即座に反映）
+browser.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.addonSettings) {
+    console.log('📢 ストレージの変更を検出（バックグラウンド）:', changes.addonSettings.newValue);
+    if (changes.addonSettings.newValue) {
+      currentSettings = { ...DEFAULT_SETTINGS, ...changes.addonSettings.newValue };
+      console.log('✅ バックグラウンドの設定を更新しました:', currentSettings);
+    }
+  }
+});
+
+// フラグをリセットする関数
+function resetFlags() {
+  console.log("🔄 フラグをリセットします");
+  warningShown = false;
+  privacyEnhancementShown = false;
 }
 
 // 送信元メールアドレスを抽出する関数
@@ -178,6 +197,17 @@ async function enhancePrivacy(tabId, composeDetails) {
       }
     } else {
       console.log("❌ ユーザーがプライバシー保護強化をキャンセルしました");
+      
+      // キャンセル時のガイダンス通知
+      if (getSetting('showNotifications')) {
+        await browser.notifications.create('privacy-enhancement-cancel-' + Date.now(), {
+          type: 'basic',
+          iconUrl: '',
+          title: '📋 プライバシー保護に関するガイダンス',
+          message: `BCC欄のアドレスは相互に見えません。現在の設定で送信を続行できますが、一部のメールサーバーではTO欄が空の場合にエラーが発生する可能性があります。`
+        });
+      }
+      
       return false;
     }
   }
@@ -186,58 +216,128 @@ async function enhancePrivacy(tabId, composeDetails) {
   return false;
 }
 
-// プライバシー保護強化の確認ダイアログ
+// プライバシー保護強化の確認ダイアログ（改良版）
 async function showPrivacyEnhancementDialog(tabId, myEmail, bccCount) {
   console.log("🔒 プライバシー保護強化確認ダイアログを表示");
   
+  // 重複防止
+  if (privacyEnhancementShown) {
+    console.log("⚠️ プライバシー保護強化ダイアログは既に表示されています。重複を防止します。");
+    return true; // 既に表示済みの場合は自動的に有効にする
+  }
+  
+  privacyEnhancementShown = true;
+  
   try {
-    // システム通知
+    // 方法1: システム通知（常に動作）
     if (getSetting('showNotifications')) {
       await browser.notifications.create('privacy-enhancement-confirm-' + Date.now(), {
         type: 'basic',
         iconUrl: '',
         title: '🔒 プライバシー保護強化の提案',
-        message: `TO欄が空ですが、BCC欄に${bccCount}個のアドレスがあります。送信元アドレスをTO欄に自動追加しますか？`
+        message: `TO欄が空ですが、BCC欄に${bccCount}個のアドレスがあります。送信元アドレスをTO欄に自動追加します。`
       });
     }
     
-    // アラートダイアログで確認
-    await browser.tabs.executeScript(tabId, {
-      code: `
-        if (window.confirm) {
-          const confirmed = confirm(
-            "🔒 プライバシー保護強化の提案\\n\\n" +
-            "TO欄が空ですが、BCC欄に${bccCount}個のアドレスがあります。\\n\\n" +
-            "送信元アドレス (${myEmail}) をTO欄に自動追加しますか？\\n\\n" +
-            "✓ メリット: 受信者間の相互可視性を完全遮断\\n" +
-            "⚠️ 注意: 一部のメールクライアントで「自分宛て」と表示される場合があります\\n\\n" +
-            "「OK」で自動追加、「キャンセル」で手動調整"
-          );
-          
-          // 結果をローカルストレージに保存（一時的）
-          localStorage.setItem('privacyEnhancementConfirmed', confirmed);
-        }
-      `
-    });
+    // 方法2: アラートダイアログによる確認（TO欄警告と同じ方式）
+    console.log("🔒 アラートダイアログによる確認を開始します");
     
-    // 結果を取得
-    const result = await browser.tabs.executeScript(tabId, {
-      code: `
-        const confirmed = localStorage.getItem('privacyEnhancementConfirmed');
-        localStorage.removeItem('privacyEnhancementConfirmed');
-        confirmed === 'true';
-      `
-    });
+    const confirmRequired = getSetting('privacyEnhancementConfirm');
     
-    const confirmed = result[0].result;
-    console.log("🔒 ユーザーの選択:", confirmed);
+    if (!confirmRequired) {
+      console.log("🔒 確認設定が無効なため、自動的にプライバシー保護強化を実行します");
+      return true;
+    }
     
-    return confirmed;
+    // アラートダイアログを表示
+    try {
+      await browser.tabs.executeScript(tabId, {
+        code: `
+          try {
+            if (window.confirm) {
+              const confirmed = confirm(
+                "🔒 プライバシー保護強化の提案\\n\\n" +
+                "TO欄が空ですが、BCC欄に${bccCount}個のアドレスがあります。\\n\\n" +
+                "送信元アドレス (${myEmail}) をTO欄に自動追加しますか？\\n\\n" +
+                "✓ メリット: 受信者間の相互可視性を完全遮断\\n" +
+                "⚠️ 注意: 一部のメールクライアントで「自分宛て」と表示される場合があります\\n\\n" +
+                "「OK」で自動追加、「キャンセル」で手動調整"
+              );
+              
+              // 結果をローカルストレージに保存
+              localStorage.setItem('privacyEnhancementConfirmed', confirmed);
+              console.log("🔒 プライバシー保護強化確認結果を保存:", confirmed);
+            }
+          } catch (e) {
+            console.error("プライバシー保護強化確認エラー:", e);
+            localStorage.setItem('privacyEnhancementConfirmed', false);
+          }
+        `
+      });
+      
+      // 結果を取得
+      const result = await browser.tabs.executeScript(tabId, {
+        code: `
+          try {
+            const confirmed = localStorage.getItem('privacyEnhancementConfirmed');
+            localStorage.removeItem('privacyEnhancementConfirmed');
+            console.log("🔒 取得した確認結果:", confirmed);
+            confirmed === 'true';
+          } catch (e) {
+            console.error("確認結果取得エラー:", e);
+            false;
+          }
+        `
+      });
+      
+      const userConfirmed = result[0].result;
+      console.log("🔒 ユーザーの選択:", userConfirmed);
+      
+      if (userConfirmed) {
+        console.log("✅ ユーザーがプライバシー保護強化を許可しました");
+        return true;
+      } else {
+        console.log("❌ ユーザーがプライバシー保護強化をキャンセルしました");
+        return false;
+      }
+      
+    } catch (alertError) {
+      console.log("アラートダイアログ表示エラー:", alertError.message);
+      
+      // アラートが失敗した場合の代替手段（システム通知）
+      console.log("🔒 アラートダイアログが失敗したため、システム通知で代替します");
+      
+      if (getSetting('showNotifications')) {
+        await browser.notifications.create('privacy-enhancement-fallback-' + Date.now(), {
+          type: 'basic',
+          iconUrl: '',
+          title: '🔒 プライバシー保護強化の確認',
+          message: `TO欄が空です。BCC欄の${bccCount}個のアドレスを保護するため、送信元アドレス (${myEmail}) をTO欄に追加しますか？`
+        });
+      }
+      
+      // 代替手段でも5秒間待機
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      console.log("🔒 代替手段のタイムアウト - デフォルトで許可します");
+      return true;
+    }
     
   } catch (error) {
     console.error("❌ プライバシー保護強化確認ダイアログエラー:", error);
-    // エラーの場合はデフォルトでfalse（手動調整を推奨）
-    return false;
+    
+    // エラーの場合も自動的に有効にする（安全のため）
+    console.log("🔒 エラーのため、自動的にプライバシー保護強化を有効にします");
+    
+    if (getSetting('showNotifications')) {
+      await browser.notifications.create('privacy-enhancement-error-' + Date.now(), {
+        type: 'basic',
+        iconUrl: '',
+        title: '🔒 プライバシー保護強化を自動実行',
+        message: `エラーのため確認ダイアログが表示できませんでした。自動的に送信元アドレスをTO欄に追加します。`
+      });
+    }
+    
+    return true; // エラーの場合も自動的に有効にする
   }
 }
 
@@ -341,10 +441,11 @@ async function checkForMisend(tabId) {
       console.log("📋 更新されたメール詳細:", updatedDetails);
       
       // 更新された詳細でチェックを続行
-      return await performMisendCheck(updatedDetails);
+      return await performMisendCheck(tabId, updatedDetails);
     } else {
-      // 通常のチェックを実行
-      return await performMisendCheck(composeDetails);
+      // 通常のチェックを実行（プライバシー保護強化が実行されなかった場合）
+      console.log("🔄 プライバシー保護強化は実行されませんでした。通常のチェックを実行します。");
+      return await performMisendCheck(tabId, composeDetails);
     }
     
   } catch (error) {
@@ -356,7 +457,11 @@ async function checkForMisend(tabId) {
 }
 
 // 誤送信チェックの実際の処理
-async function performMisendCheck(composeDetails) {
+async function performMisendCheck(tabId, composeDetails) {
+  console.log("🔍 performMisendCheck 開始");
+  console.log("📋 tabId:", tabId);
+  console.log("📋 入力されたcomposeDetails:", composeDetails);
+  
   const toAddresses = parseEmailAddresses(composeDetails.to);
   const ccAddresses = parseEmailAddresses(composeDetails.cc);
   const bccAddresses = parseEmailAddresses(composeDetails.bcc);
@@ -364,6 +469,7 @@ async function performMisendCheck(composeDetails) {
   console.log("📧 TOアドレス一覧:", toAddresses);
   console.log("📧 CCアドレス一覧:", ccAddresses);
   console.log("📧 BCCアドレス一覧:", bccAddresses);
+  console.log("📧 TOアドレス数:", toAddresses.length);
 
   // TO欄に複数のメールアドレスがある場合に警告
   if (toAddresses.length > 1) {
@@ -372,7 +478,7 @@ async function performMisendCheck(composeDetails) {
     console.log("🚨 TO欄警告処理を開始します");
     
     // 警告ダイアログを表示
-    const warningResult = await showWarningDialog(composeDetails.tabId, toAddresses, "TO");
+    const warningResult = await showWarningDialog(tabId, toAddresses, "TO");
     console.log("🚨 TO欄警告処理結果:", warningResult);
     
     return true; // 送信を停止
@@ -383,14 +489,17 @@ async function performMisendCheck(composeDetails) {
     console.log("検出されたアドレス:", ccAddresses);
     
     // CC欄の複数アドレス送信が許可されているかチェック
-    if (getSetting('ccMultipleAllowed')) {
+    const ccMultipleAllowed = getSetting('ccMultipleAllowed');
+    console.log("🔧 CC欄複数アドレス許可設定:", ccMultipleAllowed);
+    
+    if (ccMultipleAllowed) {
       console.log("✅ CC欄の複数アドレス送信が許可されています。送信を続行します。");
       return false; // 送信を続行
     } else {
       console.log("🚨 CC欄警告処理を開始します");
       
       // 警告ダイアログを表示
-      const warningResult = await showWarningDialog(composeDetails.tabId, ccAddresses, "CC");
+      const warningResult = await showWarningDialog(tabId, ccAddresses, "CC");
       console.log("🚨 CC欄警告処理結果:", warningResult);
       
       return true; // 送信を停止
@@ -444,39 +553,59 @@ async function showWarningDialog(tabId, addresses, fieldType = "TO") {
     console.error("送信が停止されました。BCC欄を使用してください。");
     console.error("🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨");
     
-    // 方法3: タブタイトル変更とアラート（JavaScript依存）
+    // 方法3: コンポーズタブでの直接スクリプト実行（改良版）
     try {
-      const tab = await browser.tabs.get(tabId);
-      if (tab) {
-        // タブのタイトルを変更
-        try {
-          await browser.tabs.executeScript(tabId, {
-            code: `
-              document.title = "⚠️ 誤送信防止警告 - ${fieldType}欄の複数アドレスを確認してください";
-              console.error("🚨 誤送信防止警告: ${fieldType}欄に複数のメールアドレスが検出されました！");
-            `
-          });
-          console.log("✅ タブタイトルを変更しました");
-        } catch (titleError) {
-          console.log("タブタイトル変更エラー:", titleError.message);
-        }
+      console.log("🔍 タブID確認:", tabId, "型:", typeof tabId);
+      
+      // タブのタイトルを変更
+      try {
+        await browser.tabs.executeScript(tabId, {
+          code: `
+            document.title = "⚠️ 誤送信防止警告 - ${fieldType}欄の複数アドレスを確認してください";
+            console.error("🚨 誤送信防止警告: ${fieldType}欄に複数のメールアドレスが検出されました！");
+          `
+        });
+        console.log("✅ タブタイトルを変更しました");
+      } catch (titleError) {
+        console.log("タブタイトル変更エラー:", titleError.message);
+      }
+      
+      // アラートダイアログを表示（より堅牢な方法）
+      try {
+        const alertScript = `
+          try {
+            if (window.alert) {
+              alert("⚠️ 誤送信防止警告\\n\\n${fieldType}欄に複数のメールアドレスが検出されました。\\n\\n検出されたアドレス:\\n• ${addresses.join('\\n• ')}\\n\\nBCC欄を使用することを推奨します。\\n\\n送信が停止されました。");
+            }
+          } catch (e) {
+            console.error("アラート表示内部エラー:", e);
+          }
+        `;
         
-        // アラートダイアログを表示
+        await browser.tabs.executeScript(tabId, {
+          code: alertScript
+        });
+        console.log("✅ アラートダイアログを表示しました");
+      } catch (alertError) {
+        console.log("アラート表示エラー:", alertError.message);
+        
+        // アラートが失敗した場合の代替手段（confirm を使用）
         try {
           await browser.tabs.executeScript(tabId, {
             code: `
-              if (window.alert) {
-                alert("⚠️ 誤送信防止警告\\n\\n${fieldType}欄に複数のメールアドレスが検出されました。\\n\\n検出されたアドレス:\\n• ${addresses.join('\\n• ')}\\n\\nBCC欄を使用することを推奨します。\\n\\n送信が停止されました。");
+              if (window.confirm) {
+                confirm("⚠️ 誤送信防止警告\\n\\n${fieldType}欄に複数のメールアドレスが検出されました。\\n\\n検出されたアドレス:\\n• ${addresses.join('\\n• ')}\\n\\nBCC欄を使用することを推奨します。\\n\\n送信が停止されました。\\n\\n「OK」で確認");
               }
             `
           });
-          console.log("✅ アラートダイアログを表示しました");
-        } catch (alertError) {
-          console.log("アラート表示エラー:", alertError.message);
+          console.log("✅ 代替確認ダイアログを表示しました");
+        } catch (confirmError) {
+          console.log("確認ダイアログ表示エラー:", confirmError.message);
         }
       }
     } catch (tabError) {
       console.log("タブ操作エラー:", tabError.message);
+      console.log("タブIDの詳細:", tabId);
     }
     
     // 方法4: 複数の追加通知（時間差で確実に表示）
@@ -536,14 +665,19 @@ async function initializeAddon() {
           
           if (shouldCancel) {
             console.log("❌ 送信をキャンセルしました");
+            // キャンセル時にフラグをリセット
+            resetFlags();
             return { cancel: true };
           }
           
           console.log("✅ 送信を続行します");
+          // 送信完了時にもフラグをリセット
+          resetFlags();
           return { cancel: false };
         } catch (error) {
           console.error("❌ 送信前チェックでエラーが発生しました:", error);
-          // エラーの場合は安全のため送信を停止
+          // エラーの場合もフラグをリセット
+          resetFlags();
           return { cancel: true };
         }
       });
@@ -579,6 +713,12 @@ async function initializeAddon() {
         });
         return true;
       }
+      
+      // pingメッセージの処理（接続確認用）
+      if (request.action === 'ping') {
+        sendResponse({ status: 'ok', timestamp: Date.now() });
+        return true;
+      }
     });
     
     isInitialized = true;
@@ -594,6 +734,7 @@ async function initializeAddon() {
 // グローバル変数
 let isInitialized = false;
 let warningShown = false;
+let privacyEnhancementShown = false; // プライバシー保護強化ダイアログの重複防止
 
 // アドオンがインストールされた時の処理
 browser.runtime.onInstalled.addListener(async (details) => {

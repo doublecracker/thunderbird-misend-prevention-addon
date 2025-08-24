@@ -3,7 +3,7 @@
 <div align="center">
 
 ![Thunderbird Logo](https://img.shields.io/badge/Thunderbird-78.0+-0078D4?style=for-the-badge&logo=thunderbird&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.1.2-green?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.2.0-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
 ![Language](https://img.shields.io/badge/Language-Japanese-red?style=for-the-badge)
 
@@ -36,7 +36,7 @@
 
 **作成者**: AKIO OGAWA  
 **作成日**: 2025年8月23日  
-**バージョン**: 1.1.4
+**バージョン**: 1.2.0
 
 このアドオンは、Mozilla Thunderbirdでメール送信時にTO欄に複数のメールアドレスが入力されている場合に誤送信を防止するためのアドオンです。特に一斉メール送信時のプライバシー保護に重点を置いて開発されています。
 
@@ -58,6 +58,16 @@
 - **複数の警告表示**: システム通知、アラートダイアログ、コンソール警告で確実に通知
 - **強制停止**: エラーが発生しても確実に送信を停止
 
+### 🔒 プライバシー保護強化機能（新機能）
+- **BCC送信時の自動保護**: BCC欄のみで送信する際、TO欄が空の場合は送信元アドレスを自動追加
+- **ユーザー確認システム**: プライバシー保護強化の実行前にユーザーに確認を求める
+- **設定可能な動作**: 確認の有効/無効を設定画面で選択可能
+
+### ⚙️ 設定機能（新機能）
+- **カスタマイズ可能**: 各機能の有効/無効を設定画面で調整
+- **リアルタイム反映**: 設定変更が即座に動作に反映
+- **デフォルト設定**: 初回起動時に最適な設定が自動適用
+
 ### 💬 ユーザーフレンドリー
 - **分かりやすい警告**: 日本語での詳細なメッセージ表示
 - **BCC推奨**: TO欄ではなくBCC欄の使用を推奨するガイダンス
@@ -70,7 +80,7 @@
 | 送信パターン | TO欄 | BCC欄 | 結果 |
 |-------------|------|-------|------|
 | 単一宛先 | 1件 | - | ✅ 送信許可 |
-| BCC一斉送信 | - | 複数件 | ✅ 送信許可 |
+| BCC一斉送信 | - | 複数件 | ✅ 送信許可（プライバシー保護強化） |
 | 混合パターン | 1件 | 複数件 | ✅ 送信許可 |
 
 ### ⚠️ 警告が表示されるパターン
@@ -80,13 +90,19 @@
 | TO一斉送信 | 2件以上 | - | ❌ 送信停止 + 警告表示 |
 | CC一斉送信 | - | 2件以上 | ❌ 送信停止 + 警告表示 |
 
+### 🔒 プライバシー保護強化パターン
+
+| 送信パターン | TO欄 | BCC欄 | 結果 |
+|-------------|------|-------|------|
+| BCCのみ送信 | 空 | 複数件 | 🔒 確認ダイアログ + 自動追加 |
+
 ## 📦 インストール方法
 
 ### 🎯 推奨方法: 直接インストール
 
 1. **ZIPファイルをダウンロード**
    ```
-   thunderbird_-1.1.2.zip
+   thunderbird_-1.2.0.zip
    ```
 
 2. **Thunderbirdでインストール**
@@ -134,20 +150,42 @@ BCC欄を使用することを推奨します。
 2. BCC欄に複数のアドレスを移動
 3. 再度送信を実行
 
+### 🔒 プライバシー保護強化の確認ダイアログ
+
+```
+🔒 プライバシー保護強化の提案
+
+TO欄が空ですが、BCC欄に2個のアドレスがあります。
+
+送信元アドレス (your-email@example.com) をTO欄に自動追加しますか？
+
+✓ メリット: 受信者間の相互可視性を完全遮断
+⚠️ 注意: 一部のメールクライアントで「自分宛て」と表示される場合があります
+
+「OK」で自動追加、「キャンセル」で手動調整
+```
+
+**選択肢**:
+- **「OK」をクリック**: 送信元アドレスをTO欄に自動追加
+- **「キャンセル」をクリック**: 現在の設定で送信を続行
+
 ## ⚙️ 技術仕様
 
 ### 🔧 アーキテクチャ
 
 - **Background Script**: `background.js` - メイン処理
 - **Content Script**: `content.js` - 送信ボタン監視
+- **Options Page**: `options.html` + `options.js` - 設定画面
 - **Manifest V2**: Thunderbird対応
 
 ### 🌐 WebExtension APIs
 
 - `browser.compose.onBeforeSend`: 送信前イベント（メイン）
 - `browser.compose.getComposeDetails`: メール詳細取得
+- `browser.compose.setComposeDetails`: メール内容更新
 - `browser.notifications.create`: システム通知
 - `browser.tabs.executeScript`: アラート表示
+- `browser.storage.local`: 設定の保存・読み込み
 
 ### 🔒 権限
 
@@ -157,7 +195,8 @@ BCC欄を使用することを推奨します。
     "compose",      // メール作成機能
     "notifications", // システム通知
     "tabs",         // タブ操作
-    "activeTab"     // アクティブタブアクセス
+    "activeTab",    // アクティブタブアクセス
+    "storage"       // 設定の保存・読み込み
   ]
 }
 ```
@@ -269,7 +308,7 @@ thunderbird-misend-prevention/
 ├── CHANGELOG.md        # 更新履歴
 ├── CONTRIBUTING.md     # 開発ガイドライン
 └── web-ext-artifacts/  # ビルド成果物
-    └── thunderbird_-1.1.2.zip
+    └── thunderbird_-1.2.0.zip
 ```
 
 ### 🤝 貢献方法
@@ -297,6 +336,13 @@ BCC欄のみでメールを送信する際にエラーが発生する場合：
    - 無効なアドレスが含まれていないか確認
 
 ## 📈 更新履歴
+
+- **v1.2.0** (2025年8月24日): プライバシー保護強化版
+  - 🔒 **プライバシー保護強化機能**: BCC送信時の自動保護
+  - ⚙️ **設定機能**: カスタマイズ可能な設定画面
+  - 🔍 **ユーザー確認システム**: アラートダイアログによる確認
+  - 🛡️ **設定同期**: リアルタイムでの設定反映
+  - 📱 **UI改善**: モダンな設定画面デザイン
 
 - **v1.1.4** (2025年8月23日): CC欄警告修正版
   - CC欄警告ダイアログの表示問題を修正
